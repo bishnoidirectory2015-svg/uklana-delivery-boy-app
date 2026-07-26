@@ -25,10 +25,12 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 public class MainActivity extends AppCompatActivity {
-    private LinearLayout ordersContainer, cashHistoryContainer, onlineHistoryContainer;
-    private TextView runningTotal, earningTotal, onlineDue, statusText, deliveryName, emptyText;
+    private LinearLayout ordersContainer;
+    private TextView runningTotal, onlineDue, statusText, deliveryName, emptyText;
     private Button pendingTab, doneTab;
     private String currentType = "pending";
+    private JSONArray companyHistory = new JSONArray();
+    private JSONArray onlineChargeHistory = new JSONArray();
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable poll = new Runnable() {
         @Override public void run() { load(); handler.postDelayed(this, AppConfig.REFRESH_MS); }
@@ -44,6 +46,8 @@ public class MainActivity extends AppCompatActivity {
         doneTab.setOnClickListener(v -> switchTab("done"));
         findViewById(R.id.resetTotalButton).setOnClickListener(v -> resetCompanyCash());
         findViewById(R.id.resetOnlineDeliveryButton).setOnClickListener(v -> resetOnlineDelivery());
+        findViewById(R.id.companyHistoryButton).setOnClickListener(v -> showHistory("Company Cash History", companyHistory));
+        findViewById(R.id.onlineHistoryButton).setOnClickListener(v -> showHistory("Online Delivery Charge History", onlineChargeHistory));
         findViewById(R.id.refreshButton).setOnClickListener(v -> load());
         findViewById(R.id.menuButton).setOnClickListener(this::showMenu);
         NotificationHelper.channel(this);
@@ -58,10 +62,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void bindViews() {
         ordersContainer = findViewById(R.id.ordersContainer);
-        cashHistoryContainer = findViewById(R.id.receivedHistoryContainer);
-        onlineHistoryContainer = findViewById(R.id.onlineDeliveryHistoryContainer);
         runningTotal = findViewById(R.id.runningTotal);
-        earningTotal = findViewById(R.id.deliveryEarningTotal);
         onlineDue = findViewById(R.id.onlineDeliveryDue);
         statusText = findViewById(R.id.statusText);
         deliveryName = findViewById(R.id.deliveryName);
@@ -123,7 +124,6 @@ public class MainActivity extends AppCompatActivity {
 
     private void render(JSONObject dashboard, JSONArray orders) {
         runningTotal.setText(dashboard.optString("running_total", "₹0.00"));
-        earningTotal.setText(dashboard.optString("delivery_earning_total", "₹0.00"));
         onlineDue.setText(dashboard.optString("online_delivery_due", "₹0.00"));
         statusText.setText("Pending: " + dashboard.optInt("assigned_count") + "   •   Delivered: " + dashboard.optInt("delivered_count"));
         ordersContainer.removeAllViews();
@@ -131,8 +131,10 @@ public class MainActivity extends AppCompatActivity {
         emptyText.setVisibility(count == 0 ? View.VISIBLE : View.GONE);
         emptyText.setText("done".equals(currentType) ? "No completed orders yet" : "No pending delivery orders");
         for (int i = 0; i < count; i++) addOrderCard(orders.optJSONObject(i));
-        renderHistory(cashHistoryContainer, dashboard.optJSONArray("reset_history"));
-        renderHistory(onlineHistoryContainer, dashboard.optJSONArray("online_delivery_reset_history"));
+        companyHistory = dashboard.optJSONArray("reset_history");
+        if (companyHistory == null) companyHistory = new JSONArray();
+        onlineChargeHistory = dashboard.optJSONArray("online_delivery_reset_history");
+        if (onlineChargeHistory == null) onlineChargeHistory = new JSONArray();
     }
 
     private void addOrderCard(JSONObject o) {
@@ -182,12 +184,15 @@ public class MainActivity extends AppCompatActivity {
         card.addView(actions);
 
         if (!"done".equals(currentType)) {
-            Button delivered = actionButton("MARK AS DELIVERED");
-            delivered.setTextSize(16);
-            LinearLayout.LayoutParams dp = new LinearLayout.LayoutParams(-1, this.dp(50));
-            dp.setMargins(0, this.dp(10), 0, 0);
-            card.addView(delivered, dp);
-            delivered.setOnClickListener(v -> delivered(o.optString("id")));
+            String nextLabel = o.optString("next_label", "UPDATE ORDER STATUS");
+            String nextStatus = o.optString("next_status", "");
+            Button statusButton = actionButton(nextLabel.toUpperCase());
+            statusButton.setTextSize(15);
+            LinearLayout.LayoutParams statusLp = new LinearLayout.LayoutParams(-1, this.dp(50));
+            statusLp.setMargins(0, this.dp(10), 0, 0);
+            card.addView(statusButton, statusLp);
+            statusButton.setEnabled(!nextStatus.isEmpty());
+            statusButton.setOnClickListener(v -> updateOrderStatus(o.optString("id"), nextStatus, nextLabel));
         } else {
             addLine(card, "Delivered At", o.optString("delivered_at"));
         }
@@ -212,14 +217,52 @@ public class MainActivity extends AppCompatActivity {
         try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(target))); } catch (Exception e) { toast("Map app not available"); }
     }
 
-    private void renderHistory(LinearLayout container, JSONArray array) {
-        container.removeAllViews();
-        if (array == null || array.length() == 0) { TextView e = text("No history", 14, false); e.setPadding(0, dp(6), 0, dp(6)); container.addView(e); return; }
-        for (int i = 0; i < array.length(); i++) { JSONObject x = array.optJSONObject(i); TextView v = text(x.optString("date_time") + "  —  " + x.optString("amount"), 14, false); v.setPadding(0, dp(6), 0, dp(6)); container.addView(v); }
+    private void showHistory(String title, JSONArray array) {
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(20), dp(10), dp(20), dp(10));
+        if (array == null || array.length() == 0) {
+            TextView empty = text("No history", 15, false);
+            empty.setPadding(0, dp(12), 0, dp(12));
+            content.addView(empty);
+        } else {
+            for (int i = 0; i < array.length(); i++) {
+                JSONObject x = array.optJSONObject(i);
+                TextView row = text((i + 1) + ".  " + x.optString("date_time") + "  —  " + x.optString("amount"), 14, false);
+                row.setPadding(0, dp(10), 0, dp(10));
+                content.addView(row);
+            }
+        }
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        scroll.addView(content);
+        new AlertDialog.Builder(this)
+            .setTitle(title)
+            .setView(scroll)
+            .setPositiveButton("CLOSE", null)
+            .show();
     }
 
-    private void delivered(String id) { new AlertDialog.Builder(this).setTitle("Mark order delivered?").setMessage("Customer ko order dene aur payment confirm karne ke baad hi Delivered dabayein.").setPositiveButton("DELIVERED", (d, w) -> new Thread(() -> { try { JSONObject r=ApiClient.post(this, AppConfig.DELIVERED, new JSONObject().put("order_id", id)); runOnUiThread(() -> toast(r.optString("message","Order delivered"))); load(); } catch (Exception e) { runOnUiThread(() -> toast(e.getMessage())); } }).start()).setNegativeButton("CANCEL", null).show(); }
-    private void resetOnlineDelivery() { new AlertDialog.Builder(this).setTitle("Online delivery charge paid?").setMessage("Admin se online delivery charge milne ke baad hi reset karein.").setPositiveButton("PAID / RESET", (d,w)->new Thread(()->{try{ApiClient.post(this,AppConfig.RESET_ONLINE_DELIVERY,new JSONObject());load();}catch(Exception e){runOnUiThread(()->toast(e.getMessage()));}}).start()).setNegativeButton("CANCEL",null).show(); }
+    private void updateOrderStatus(String id, String nextStatus, String nextLabel) {
+        if (nextStatus == null || nextStatus.isEmpty()) { toast("Next status available nahi hai"); return; }
+        String message = "ukf-delivered".equals(nextStatus)
+            ? "Customer ko order dene aur payment confirm karne ke baad hi Delivered karein."
+            : "Order status ko " + nextLabel + " karna hai?";
+        new AlertDialog.Builder(this)
+            .setTitle(nextLabel + "?")
+            .setMessage(message)
+            .setPositiveButton("YES", (d, w) -> new Thread(() -> {
+                try {
+                    JSONObject body = new JSONObject().put("order_id", id).put("status", nextStatus);
+                    JSONObject r = ApiClient.post(this, AppConfig.UPDATE_STATUS, body);
+                    runOnUiThread(() -> toast(r.optString("message", "Status updated")));
+                    load();
+                } catch (Exception e) {
+                    runOnUiThread(() -> toast(e.getMessage()));
+                }
+            }).start())
+            .setNegativeButton("CANCEL", null).show();
+    }
+    private void resetOnlineDelivery() { new AlertDialog.Builder(this).setTitle("Online delivery charge paid?").setMessage("Admin se online delivery charge milne ke baad hi reset karein.").setPositiveButton("RESET", (d,w)->new Thread(()->{try{ApiClient.post(this,AppConfig.RESET_ONLINE_DELIVERY,new JSONObject());load();}catch(Exception e){runOnUiThread(()->toast(e.getMessage()));}}).start()).setNegativeButton("CANCEL",null).show(); }
     private void resetCompanyCash() { new AlertDialog.Builder(this).setTitle("Submit and reset company cash?").setMessage("Company ko cash jama karne ke baad hi reset karein.").setPositiveButton("RESET", (d,w)->new Thread(()->{try{ApiClient.post(this,AppConfig.RESET,new JSONObject());load();}catch(Exception e){runOnUiThread(()->toast(e.getMessage()));}}).start()).setNegativeButton("CANCEL",null).show(); }
     private void toast(String s) { Toast.makeText(this, s == null ? "" : s, Toast.LENGTH_LONG).show(); }
 }

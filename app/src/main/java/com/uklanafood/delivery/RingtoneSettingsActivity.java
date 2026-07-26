@@ -35,7 +35,7 @@ public class RingtoneSettingsActivity extends AppCompatActivity {
     private void choose() {
         Uri current = RingtoneHelper.getSelectedUri(this);
         Intent i = new Intent(RingtoneManager.ACTION_RINGTONE_PICKER);
-        i.putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM);
+        i.putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_RINGTONE);
         i.putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Select New Order Ringtone");
         i.putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, current);
         i.putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false);
@@ -57,7 +57,7 @@ public class RingtoneSettingsActivity extends AppCompatActivity {
     private void updateName() {
         Uri uri = RingtoneHelper.getSelectedUri(this);
         Ringtone r = RingtoneManager.getRingtone(this, uri);
-        selected.setText(r == null ? "Default Alarm Sound" : r.getTitle(this));
+        selected.setText(r == null ? "Default Phone Ringtone" : r.getTitle(this));
     }
 
     @Override protected void onStop() { super.onStop(); RingtoneHelper.stop(); }
