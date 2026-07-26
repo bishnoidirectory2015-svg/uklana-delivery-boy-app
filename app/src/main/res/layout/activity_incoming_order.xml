@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="24dp"
+    android:background="#FFF7ED">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🔔"
+        android:textSize="64sp" />
+
+    <TextView
+        android:id="@+id/alertTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:text="NEW ORDER RECEIVED"
+        android:textColor="#9A3412"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        android:layout_marginTop="12dp" />
+
+    <TextView
+        android:id="@+id/alertOrderId"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:textColor="#111827"
+        android:textSize="21sp"
+        android:textStyle="bold"
+        android:layout_marginTop="12dp" />
+
+    <TextView
+        android:id="@+id/alertMessage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:textColor="#374151"
+        android:textSize="18sp"
+        android:layout_marginTop="14dp"
+        android:padding="16dp" />
+
+    <Button
+        android:id="@+id/openOrderButton"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:text="ACCEPT &amp; SEE ORDER"
+        android:textSize="18sp"
+        android:layout_marginTop="24dp" />
+
+
+</LinearLayout>

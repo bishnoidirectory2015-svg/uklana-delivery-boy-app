@@ -1,0 +1,3 @@
+package com.uklanafood.delivery;
+import android.content.*;import org.json.*;
+public class OrderActionReceiver extends BroadcastReceiver{public void onReceive(Context c,Intent i){String id=i.getStringExtra("order_id");String action=i.getAction();NotificationHelper.cancel(c,id);new Thread(()->{try{JSONObject q=new JSONObject();q.put("order_id",id);JSONObject r=ApiClient.post(c,"ACCEPT".equals(action)?AppConfig.ACCEPT:AppConfig.FORWARD,q);Intent x=new Intent(c,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TOP).putExtra("message",r.optString("message"));c.startActivity(x);}catch(Exception ignored){}}).start();}}

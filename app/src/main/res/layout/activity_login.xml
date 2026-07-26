@@ -1,0 +1,11 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:background="#FFF7ED">
+ <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="24dp" android:gravity="center_horizontal">
+  <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="🍴 Uklana Restaurant" android:textSize="28sp" android:textStyle="bold" android:gravity="center" android:textColor="#222222" android:layout_marginTop="55dp"/>
+  <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Restaurant Partner Login" android:textSize="17sp" android:gravity="center" android:textColor="#666666" android:layout_marginTop="6dp" android:layout_marginBottom="28dp"/>
+  <EditText android:id="@+id/loginPhone" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="10 digit mobile number" android:inputType="phone" android:maxLength="10" android:textSize="18sp" android:padding="16dp"/>
+  <EditText android:id="@+id/loginPin" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Admin se mila Login PIN" android:inputType="numberPassword" android:textSize="18sp" android:padding="16dp" android:layout_marginTop="12dp"/>
+  <Button android:id="@+id/loginButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="LOGIN" android:textSize="19sp" android:textStyle="bold" android:layout_marginTop="22dp"/>
+  <ProgressBar android:id="@+id/loginProgress" android:layout_width="wrap_content" android:layout_height="wrap_content" android:visibility="gone" android:layout_marginTop="16dp"/>
+  <TextView android:id="@+id/loginMessage" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Sirf Admin dwara add kiya gaya active restaurant number login kar sakta hai." android:textSize="15sp" android:gravity="center" android:layout_marginTop="18dp"/>
+ </LinearLayout>
+</ScrollView>

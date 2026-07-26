@@ -1,0 +1,68 @@
+{
+  "project_info": {
+    "project_number": "385331638219",
+    "project_id": "uklana-food",
+    "storage_bucket": "uklana-food.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:385331638219:android:bc20b9ad2ab0724343d04e",
+        "android_client_info": {
+          "package_name": "com.uklanafood.admin"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "385331638219-0gnv84pdekf69sjr04u9g1ith0npfsuu.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD9x3FKKYDGJzl8jEzfvezKF-tYUNGRvtk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "385331638219-0gnv84pdekf69sjr04u9g1ith0npfsuu.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:385331638219:android:0f53b3689908f44743d04e",
+        "android_client_info": {
+          "package_name": "com.uklanafood.restaurant"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "385331638219-0gnv84pdekf69sjr04u9g1ith0npfsuu.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD9x3FKKYDGJzl8jEzfvezKF-tYUNGRvtk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "385331638219-0gnv84pdekf69sjr04u9g1ith0npfsuu.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

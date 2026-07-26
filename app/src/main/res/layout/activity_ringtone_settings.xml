@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:background="#FFF7F0">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="22dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="New Order Ringtone"
+            android:textColor="#222222"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:gravity="center"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="नया ऑर्डर आने पर बजने वाली ringtone चुनें"
+            android:textColor="#666666"
+            android:textSize="15sp"
+            android:gravity="center"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:orientation="vertical"
+            android:padding="18dp"
+            android:background="#FFFFFF"
+            android:elevation="3dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Selected Ringtone"
+                android:textColor="#777777"
+                android:textSize="13sp"/>
+
+            <TextView
+                android:id="@+id/txtSelectedRingtone"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="7dp"
+                android:text="Default Notification Sound"
+                android:textColor="#222222"
+                android:textSize="18sp"
+                android:textStyle="bold"/>
+
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnChooseRingtone"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="24dp"
+            android:text="Choose Ringtone"
+            android:textAllCaps="false"
+            android:textSize="16sp"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#FF7A00"/>
+
+        <Button
+            android:id="@+id/btnTestRingtone"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="12dp"
+            android:text="Test Ringtone"
+            android:textAllCaps="false"
+            android:textSize="16sp"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#222222"/>
+
+        <Button
+            android:id="@+id/btnDefaultRingtone"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="12dp"
+            android:text="Restore Default Ringtone"
+            android:textAllCaps="false"
+            android:textSize="15sp"/>
+
+        <Button
+            android:id="@+id/btnNotificationSettings"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="12dp"
+            android:text="Open Phone Notification Settings"
+            android:textAllCaps="false"
+            android:textSize="14sp"/>
+
+    </LinearLayout>
+
+</ScrollView>
