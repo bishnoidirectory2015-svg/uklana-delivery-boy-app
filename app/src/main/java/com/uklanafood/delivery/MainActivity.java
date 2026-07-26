@@ -15,6 +15,8 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.PopupMenu;
+import android.graphics.Color;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
@@ -42,8 +44,8 @@ public class MainActivity extends AppCompatActivity {
         doneTab.setOnClickListener(v -> switchTab("done"));
         findViewById(R.id.resetTotalButton).setOnClickListener(v -> resetCompanyCash());
         findViewById(R.id.resetOnlineDeliveryButton).setOnClickListener(v -> resetOnlineDelivery());
-        findViewById(R.id.logoutButton).setOnClickListener(v -> { SessionManager.clear(this); recreate(); });
         findViewById(R.id.refreshButton).setOnClickListener(v -> load());
+        findViewById(R.id.menuButton).setOnClickListener(this::showMenu);
         NotificationHelper.channel(this);
         if (Build.VERSION.SDK_INT >= 33 && ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 9);
@@ -75,9 +77,34 @@ public class MainActivity extends AppCompatActivity {
         currentType = type;
         pendingTab.setSelected("pending".equals(type));
         doneTab.setSelected("done".equals(type));
-        pendingTab.setAlpha("pending".equals(type) ? 1f : 0.55f);
-        doneTab.setAlpha("done".equals(type) ? 1f : 0.55f);
+        pendingTab.setTextColor("pending".equals(type) ? Color.WHITE : 0xff3F4854);
+        doneTab.setTextColor("done".equals(type) ? Color.WHITE : 0xff3F4854);
         load();
+    }
+
+
+    private void showMenu(View anchor) {
+        PopupMenu menu = new PopupMenu(this, anchor);
+        menu.getMenu().add("Change Order Ringtone");
+        menu.getMenu().add("Refresh Orders");
+        menu.getMenu().add("Logout");
+        menu.setOnMenuItemClickListener(item -> {
+            String title = String.valueOf(item.getTitle());
+            if (title.startsWith("Change")) {
+                startActivity(new Intent(this, RingtoneSettingsActivity.class));
+                return true;
+            }
+            if (title.startsWith("Refresh")) { load(); return true; }
+            if (title.equals("Logout")) {
+                new AlertDialog.Builder(this).setTitle("Logout?")
+                    .setMessage("Delivery Boy account se logout karna hai?")
+                    .setPositiveButton("LOGOUT", (d,w) -> { SessionManager.clear(this); recreate(); })
+                    .setNegativeButton("CANCEL", null).show();
+                return true;
+            }
+            return false;
+        });
+        menu.show();
     }
 
     private void load() {
