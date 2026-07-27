@@ -127,10 +127,21 @@ public class MainActivity extends AppCompatActivity {
         onlineDue.setText(dashboard.optString("online_delivery_due", "₹0.00"));
         statusText.setText("Pending: " + dashboard.optInt("assigned_count") + "   •   Delivered: " + dashboard.optInt("delivered_count"));
         ordersContainer.removeAllViews();
+        int visibleCount = 0;
         int count = orders == null ? 0 : orders.length();
-        emptyText.setVisibility(count == 0 ? View.VISIBLE : View.GONE);
+        for (int i = 0; i < count; i++) {
+            JSONObject order = orders.optJSONObject(i);
+            if (order == null) continue;
+
+            boolean delivered = isDeliveredOrder(order);
+            if ("pending".equals(currentType) && delivered) continue;
+            if ("done".equals(currentType) && !delivered) continue;
+
+            addOrderCard(order);
+            visibleCount++;
+        }
+        emptyText.setVisibility(visibleCount == 0 ? View.VISIBLE : View.GONE);
         emptyText.setText("done".equals(currentType) ? "No completed orders yet" : "No pending delivery orders");
-        for (int i = 0; i < count; i++) addOrderCard(orders.optJSONObject(i));
         companyHistory = dashboard.optJSONArray("reset_history");
         if (companyHistory == null) companyHistory = new JSONArray();
         onlineChargeHistory = dashboard.optJSONArray("online_delivery_reset_history");
@@ -145,8 +156,10 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2);
         cp.setMargins(0, 0, 0, dp(14));
 
-        TextView title = text("Order #" + o.optString("number") + "  •  " + ("done".equals(currentType) ? "DELIVERED" : "PENDING"), 20, true);
-        title.setTextColor(getResources().getColor("done".equals(currentType) ? android.R.color.holo_green_dark : android.R.color.holo_orange_dark));
+        boolean deliveredOrder = isDeliveredOrder(o);
+        String statusLabel = cleanStatusLabel(o);
+        TextView title = text("Order #" + o.optString("number") + "  •  " + statusLabel.toUpperCase(), 20, true);
+        title.setTextColor(getResources().getColor(deliveredOrder ? android.R.color.holo_green_dark : android.R.color.holo_orange_dark));
         card.addView(title);
         addLine(card, "Restaurant", o.optString("restaurant"));
         addLine(card, "Order Time", o.optString("order_date"));
@@ -183,9 +196,9 @@ public class MainActivity extends AppCompatActivity {
         map.setOnClickListener(v -> openMap(o.optString("map_link"), o.optString("address")));
         card.addView(actions);
 
-        if (!"done".equals(currentType)) {
-            String nextLabel = o.optString("next_label", "UPDATE ORDER STATUS");
-            String nextStatus = o.optString("next_status", "");
+        if (!deliveredOrder) {
+            String nextStatus = resolveNextStatus(o);
+            String nextLabel = resolveNextLabel(o, nextStatus);
             Button statusButton = actionButton(nextLabel.toUpperCase());
             statusButton.setTextSize(15);
             LinearLayout.LayoutParams statusLp = new LinearLayout.LayoutParams(-1, this.dp(50));
@@ -197,6 +210,77 @@ public class MainActivity extends AppCompatActivity {
             addLine(card, "Delivered At", o.optString("delivered_at"));
         }
         ordersContainer.addView(card, cp);
+    }
+
+
+    private boolean isDeliveredOrder(JSONObject order) {
+        String[] values = {
+                order.optString("wc_status", ""),
+                order.optString("status", ""),
+                order.optString("status_label", ""),
+                order.optString("next_status", "")
+        };
+        for (String value : values) {
+            String normalized = value == null ? "" : value.trim().toLowerCase();
+            if (normalized.startsWith("wc-")) normalized = normalized.substring(3);
+            if (normalized.equals("ukf-delivered") || normalized.equals("delivered") ||
+                    normalized.equals("completed") || normalized.equals("complete") ||
+                    normalized.contains("delivered") || normalized.contains("completed")) {
+                return true;
+            }
+        }
+        return !order.optString("delivered_at", "").trim().isEmpty();
+    }
+
+    private String cleanStatusLabel(JSONObject order) {
+        if (isDeliveredOrder(order)) return "Delivered";
+        String label = order.optString("status_label", "").trim();
+        if (!label.isEmpty()) return label;
+        String status = order.optString("wc_status", order.optString("status", "pending")).trim();
+        if (status.startsWith("wc-")) status = status.substring(3);
+        switch (status) {
+            case "processing":
+            case "ukf-accepted": return "Restaurant Accepted";
+            case "ukf-preparing": return "Food Preparing";
+            case "ukf-pickup": return "Picked Up";
+            case "ukf-out": return "Out for Delivery";
+            default: return "Pending";
+        }
+    }
+
+    private String resolveNextStatus(JSONObject order) {
+        String next = order.optString("next_status", "").trim();
+        if (!next.isEmpty()) return next;
+        String status = order.optString("wc_status", order.optString("status", "")).trim().toLowerCase();
+        if (status.startsWith("wc-")) status = status.substring(3);
+        switch (status) {
+            case "pending":
+            case "on-hold":
+            case "ukf-received": return "ukf-accepted";
+            case "processing":
+            case "ukf-accepted":
+            case "accepted": return "ukf-preparing";
+            case "ukf-preparing":
+            case "preparing": return "ukf-pickup";
+            case "ukf-pickup":
+            case "pickup": return "ukf-out";
+            case "ukf-out":
+            case "out": return "ukf-delivered";
+            default: return "";
+        }
+    }
+
+    private String resolveNextLabel(JSONObject order, String nextStatus) {
+        String label = order.optString("next_label", "").trim();
+        if (!label.isEmpty()) return label;
+        switch (nextStatus) {
+            case "ukf-accepted": return "Restaurant Accepted";
+            case "ukf-preparing": return "Food Preparing";
+            case "ukf-pickup": return "Picked Up";
+            case "ukf-out": return "Out for Delivery";
+            case "ukf-delivered": return "Delivered";
+            default: return "Refresh Status";
+        }
     }
 
     private TextView text(String value, int size, boolean bold) {
