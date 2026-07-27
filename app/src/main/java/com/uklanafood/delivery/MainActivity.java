@@ -4,6 +4,8 @@ import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Typeface;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -12,6 +14,7 @@ import android.os.Looper;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -24,6 +27,9 @@ import androidx.core.app.NotificationManagerCompat;
 import com.google.firebase.messaging.FirebaseMessaging;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 public class MainActivity extends AppCompatActivity {
     private LinearLayout ordersContainer;
@@ -48,8 +54,6 @@ public class MainActivity extends AppCompatActivity {
         deliveryName.setText(SessionManager.name(this) + "  •  Priority " + SessionManager.priority(this));
         pendingTab.setOnClickListener(v -> switchTab("pending"));
         doneTab.setOnClickListener(v -> switchTab("done"));
-        findViewById(R.id.resetTotalButton).setOnClickListener(v -> resetCompanyCash());
-        findViewById(R.id.resetOnlineDeliveryButton).setOnClickListener(v -> resetOnlineDelivery());
         findViewById(R.id.companyHistoryButton).setOnClickListener(v -> showHistory("Company Cash History", companyHistory));
         findViewById(R.id.onlineHistoryButton).setOnClickListener(v -> showHistory("Online Delivery Charge History", onlineChargeHistory));
         findViewById(R.id.refreshButton).setOnClickListener(v -> load());
@@ -175,9 +179,14 @@ public class MainActivity extends AppCompatActivity {
         addLine(card, "Nearby", o.optString("nearby"));
         addLine(card, "Distance", withKm(o.optString("distance")));
         addSection(card, "ORDER SUMMARY");
-        TextView items = text(o.optString("items", "No item details"), 16, false);
-        items.setPadding(0, dp(5), 0, dp(8));
-        card.addView(items);
+        JSONArray itemRows = o.optJSONArray("items_data");
+        if (itemRows != null && itemRows.length() > 0) {
+            addItemRows(card, itemRows);
+        } else {
+            TextView items = text(o.optString("items", "No item details"), 16, false);
+            items.setPadding(0, dp(5), 0, dp(8));
+            card.addView(items);
+        }
         addLine(card, "Food Amount", o.optString("food_amount"));
         addLine(card, "Delivery Charge", o.optString("delivery_charge"));
         addLine(card, "Customer Total", o.optString("customer_total"));
@@ -218,6 +227,69 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
+
+    private void addItemRows(LinearLayout card, JSONArray rows) {
+        for (int i = 0; i < rows.length(); i++) {
+            JSONObject item = rows.optJSONObject(i);
+            if (item == null) continue;
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(0, dp(8), 0, dp(8));
+
+            ImageView photo = new ImageView(this);
+            photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            photo.setBackgroundResource(R.drawable.order_card);
+            photo.setImageResource(R.drawable.ic_app);
+            LinearLayout.LayoutParams imageLp = new LinearLayout.LayoutParams(dp(72), dp(72));
+            imageLp.setMargins(0, 0, dp(12), 0);
+            row.addView(photo, imageLp);
+
+            LinearLayout details = new LinearLayout(this);
+            details.setOrientation(LinearLayout.VERTICAL);
+            details.addView(text(item.optString("name", "Item"), 16, true));
+            TextView qty = text("Quantity: " + item.optInt("quantity", 1), 15, false);
+            qty.setTextColor(0xff555F6B);
+            details.addView(qty);
+            JSONArray meta = item.optJSONArray("meta");
+            if (meta != null) {
+                for (int m = 0; m < meta.length(); m++) {
+                    String value = meta.optString(m, "").trim();
+                    if (!value.isEmpty()) {
+                        TextView mv = text("• " + value, 14, false);
+                        mv.setTextColor(0xff6B7280);
+                        details.addView(mv);
+                    }
+                }
+            }
+            row.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
+            card.addView(row, new LinearLayout.LayoutParams(-1, -2));
+            loadImage(photo, item.optString("image_url", ""));
+        }
+    }
+
+    private void loadImage(ImageView view, String imageUrl) {
+        if (imageUrl == null || imageUrl.trim().isEmpty()) return;
+        new Thread(() -> {
+            HttpURLConnection connection = null;
+            try {
+                connection = (HttpURLConnection) new URL(imageUrl).openConnection();
+                connection.setConnectTimeout(10000);
+                connection.setReadTimeout(10000);
+                connection.setInstanceFollowRedirects(true);
+                connection.connect();
+                if (connection.getResponseCode() >= 200 && connection.getResponseCode() < 300) {
+                    try (InputStream input = connection.getInputStream()) {
+                        Bitmap bitmap = BitmapFactory.decodeStream(input);
+                        if (bitmap != null) runOnUiThread(() -> view.setImageBitmap(bitmap));
+                    }
+                }
+            } catch (Exception ignored) {
+            } finally {
+                if (connection != null) connection.disconnect();
+            }
+        }).start();
+    }
 
     /**
      * Older API/plugin versions left already-finished orders in the pending feed with
@@ -379,7 +451,5 @@ public class MainActivity extends AppCompatActivity {
             }).start())
             .setNegativeButton("CANCEL", null).show();
     }
-    private void resetOnlineDelivery() { new AlertDialog.Builder(this).setTitle("Online delivery charge paid?").setMessage("Admin se online delivery charge milne ke baad hi reset karein.").setPositiveButton("RESET", (d,w)->new Thread(()->{try{ApiClient.post(this,AppConfig.RESET_ONLINE_DELIVERY,new JSONObject());load();}catch(Exception e){runOnUiThread(()->toast(e.getMessage()));}}).start()).setNegativeButton("CANCEL",null).show(); }
-    private void resetCompanyCash() { new AlertDialog.Builder(this).setTitle("Submit and reset company cash?").setMessage("Company ko cash jama karne ke baad hi reset karein.").setPositiveButton("RESET", (d,w)->new Thread(()->{try{ApiClient.post(this,AppConfig.RESET,new JSONObject());load();}catch(Exception e){runOnUiThread(()->toast(e.getMessage()));}}).start()).setNegativeButton("CANCEL",null).show(); }
     private void toast(String s) { Toast.makeText(this, s == null ? "" : s, Toast.LENGTH_LONG).show(); }
 }
