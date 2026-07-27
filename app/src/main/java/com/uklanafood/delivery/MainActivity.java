@@ -135,6 +135,7 @@ public class MainActivity extends AppCompatActivity {
 
             boolean delivered = isDeliveredOrder(order);
             if ("pending".equals(currentType) && delivered) continue;
+            if ("pending".equals(currentType) && isLegacyStalePending(order)) continue;
             if ("done".equals(currentType) && !delivered) continue;
 
             addOrderCard(order);
@@ -212,6 +213,34 @@ public class MainActivity extends AppCompatActivity {
         ordersContainer.addView(card, cp);
     }
 
+
+
+    /**
+     * Older API/plugin versions left already-finished orders in the pending feed with
+     * only a generic PENDING label and no actionable next status. New valid orders
+     * always include a current WooCommerce status or a next_status value. Hide only
+     * those non-actionable legacy rows so genuine new orders remain visible.
+     */
+    private boolean isLegacyStalePending(JSONObject order) {
+        if (isDeliveredOrder(order)) return false;
+
+        String next = order.optString("next_status", "").trim();
+        if (!next.isEmpty()) return false;
+
+        String wcStatus = order.optString("wc_status", "").trim().toLowerCase();
+        String status = order.optString("status", "").trim().toLowerCase();
+        String label = order.optString("status_label", "").trim().toLowerCase();
+
+        if (wcStatus.startsWith("wc-")) wcStatus = wcStatus.substring(3);
+        if (status.startsWith("wc-")) status = status.substring(3);
+
+        boolean genericPending =
+                wcStatus.isEmpty() &&
+                (status.isEmpty() || status.equals("pending") || status.equals("assigned")) &&
+                (label.isEmpty() || label.equals("pending") || label.equals("assigned"));
+
+        return genericPending;
+    }
 
     private boolean isDeliveredOrder(JSONObject order) {
         String[] values = {
