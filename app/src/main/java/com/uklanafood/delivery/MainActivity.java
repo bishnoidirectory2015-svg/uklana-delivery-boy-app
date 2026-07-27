@@ -13,6 +13,8 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.ImageView;
+import com.bumptech.glide.Glide;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.PopupMenu;
@@ -20,7 +22,6 @@ import android.graphics.Color;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
-import androidx.core.app.NotificationManagerCompat;
 import com.google.firebase.messaging.FirebaseMessaging;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -41,15 +42,10 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         if (!SessionManager.loggedIn(this)) { startActivity(new Intent(this, LoginActivity.class)); finish(); return; }
         setContentView(R.layout.activity_main);
-        // v2.1 fresh start: remove any old order alert left on the device.
-        NotificationManagerCompat.from(this).cancelAll();
-        RingtoneHelper.stop();
         bindViews();
         deliveryName.setText(SessionManager.name(this) + "  •  Priority " + SessionManager.priority(this));
         pendingTab.setOnClickListener(v -> switchTab("pending"));
         doneTab.setOnClickListener(v -> switchTab("done"));
-        findViewById(R.id.resetTotalButton).setOnClickListener(v -> resetCompanyCash());
-        findViewById(R.id.resetOnlineDeliveryButton).setOnClickListener(v -> resetOnlineDelivery());
         findViewById(R.id.companyHistoryButton).setOnClickListener(v -> showHistory("Company Cash History", companyHistory));
         findViewById(R.id.onlineHistoryButton).setOnClickListener(v -> showHistory("Online Delivery Charge History", onlineChargeHistory));
         findViewById(R.id.refreshButton).setOnClickListener(v -> load());
@@ -129,24 +125,12 @@ public class MainActivity extends AppCompatActivity {
     private void render(JSONObject dashboard, JSONArray orders) {
         runningTotal.setText(dashboard.optString("running_total", "₹0.00"));
         onlineDue.setText(dashboard.optString("online_delivery_due", "₹0.00"));
-        statusText.setText("Pending: " + dashboard.optInt("assigned_count") + "   •   Delivered: " + dashboard.optInt("delivered_count"));
+        statusText.setText("Current: " + dashboard.optInt("assigned_count") + "   •   Delivered: " + dashboard.optInt("delivered_count"));
         ordersContainer.removeAllViews();
-        int visibleCount = 0;
         int count = orders == null ? 0 : orders.length();
-        for (int i = 0; i < count; i++) {
-            JSONObject order = orders.optJSONObject(i);
-            if (order == null) continue;
-
-            boolean delivered = isDeliveredOrder(order);
-            if ("pending".equals(currentType) && delivered) continue;
-            if ("pending".equals(currentType) && isLegacyStalePending(order)) continue;
-            if ("done".equals(currentType) && !delivered) continue;
-
-            addOrderCard(order);
-            visibleCount++;
-        }
-        emptyText.setVisibility(visibleCount == 0 ? View.VISIBLE : View.GONE);
-        emptyText.setText("done".equals(currentType) ? "No completed orders yet" : "No pending delivery orders");
+        emptyText.setVisibility(count == 0 ? View.VISIBLE : View.GONE);
+        emptyText.setText("done".equals(currentType) ? "No completed orders yet" : "No current delivery orders");
+        for (int i = 0; i < count; i++) addOrderCard(orders.optJSONObject(i));
         companyHistory = dashboard.optJSONArray("reset_history");
         if (companyHistory == null) companyHistory = new JSONArray();
         onlineChargeHistory = dashboard.optJSONArray("online_delivery_reset_history");
@@ -161,10 +145,8 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2);
         cp.setMargins(0, 0, 0, dp(14));
 
-        boolean deliveredOrder = isDeliveredOrder(o);
-        String statusLabel = cleanStatusLabel(o);
-        TextView title = text("Order #" + o.optString("number") + "  •  " + statusLabel.toUpperCase(), 20, true);
-        title.setTextColor(getResources().getColor(deliveredOrder ? android.R.color.holo_green_dark : android.R.color.holo_orange_dark));
+        TextView title = text("Order #" + o.optString("number") + ("done".equals(currentType) ? "  •  DELIVERED" : ""), 20, true);
+        title.setTextColor(getResources().getColor("done".equals(currentType) ? android.R.color.holo_green_dark : android.R.color.holo_orange_dark));
         card.addView(title);
         addLine(card, "Restaurant", o.optString("restaurant"));
         addLine(card, "Order Time", o.optString("order_date"));
@@ -175,9 +157,14 @@ public class MainActivity extends AppCompatActivity {
         addLine(card, "Nearby", o.optString("nearby"));
         addLine(card, "Distance", withKm(o.optString("distance")));
         addSection(card, "ORDER SUMMARY");
-        TextView items = text(o.optString("items", "No item details"), 16, false);
-        items.setPadding(0, dp(5), 0, dp(8));
-        card.addView(items);
+        JSONArray itemList = o.optJSONArray("item_list");
+        if (itemList != null && itemList.length() > 0) {
+            for (int j = 0; j < itemList.length(); j++) addProductRow(card, itemList.optJSONObject(j));
+        } else {
+            TextView items = text(o.optString("items", "No item details"), 16, false);
+            items.setPadding(0, dp(5), 0, dp(8));
+            card.addView(items);
+        }
         addLine(card, "Food Amount", o.optString("food_amount"));
         addLine(card, "Delivery Charge", o.optString("delivery_charge"));
         addLine(card, "Customer Total", o.optString("customer_total"));
@@ -201,9 +188,9 @@ public class MainActivity extends AppCompatActivity {
         map.setOnClickListener(v -> openMap(o.optString("map_link"), o.optString("address")));
         card.addView(actions);
 
-        if (!deliveredOrder) {
-            String nextStatus = resolveNextStatus(o);
-            String nextLabel = resolveNextLabel(o, nextStatus);
+        if (!"done".equals(currentType)) {
+            String nextLabel = o.optString("next_label", "UPDATE ORDER STATUS");
+            String nextStatus = o.optString("next_status", "");
             Button statusButton = actionButton(nextLabel.toUpperCase());
             statusButton.setTextSize(15);
             LinearLayout.LayoutParams statusLp = new LinearLayout.LayoutParams(-1, this.dp(50));
@@ -218,102 +205,36 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
+    private void addProductRow(LinearLayout card, JSONObject item) {
+        if (item == null) return;
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, dp(7), 0, dp(7));
 
-    /**
-     * Older API/plugin versions left already-finished orders in the pending feed with
-     * only a generic PENDING label and no actionable next status. New valid orders
-     * always include a current WooCommerce status or a next_status value. Hide only
-     * those non-actionable legacy rows so genuine new orders remain visible.
-     */
-    private boolean isLegacyStalePending(JSONObject order) {
-        if (isDeliveredOrder(order)) return false;
+        ImageView image = new ImageView(this);
+        image.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        image.setBackgroundResource(R.drawable.order_card);
+        LinearLayout.LayoutParams imageLp = new LinearLayout.LayoutParams(dp(72), dp(72));
+        imageLp.setMargins(0, 0, dp(12), 0);
+        row.addView(image, imageLp);
 
-        String next = order.optString("next_status", "").trim();
-        if (!next.isEmpty()) return false;
-
-        String wcStatus = order.optString("wc_status", "").trim().toLowerCase();
-        String status = order.optString("status", "").trim().toLowerCase();
-        String label = order.optString("status_label", "").trim().toLowerCase();
-
-        if (wcStatus.startsWith("wc-")) wcStatus = wcStatus.substring(3);
-        if (status.startsWith("wc-")) status = status.substring(3);
-
-        boolean genericPending =
-                wcStatus.isEmpty() &&
-                (status.isEmpty() || status.equals("pending") || status.equals("assigned")) &&
-                (label.isEmpty() || label.equals("pending") || label.equals("assigned"));
-
-        return genericPending;
-    }
-
-    private boolean isDeliveredOrder(JSONObject order) {
-        String[] values = {
-                order.optString("wc_status", ""),
-                order.optString("status", ""),
-                order.optString("status_label", ""),
-                order.optString("next_status", "")
-        };
-        for (String value : values) {
-            String normalized = value == null ? "" : value.trim().toLowerCase();
-            if (normalized.startsWith("wc-")) normalized = normalized.substring(3);
-            if (normalized.equals("ukf-delivered") || normalized.equals("delivered") ||
-                    normalized.equals("completed") || normalized.equals("complete") ||
-                    normalized.contains("delivered") || normalized.contains("completed")) {
-                return true;
-            }
+        LinearLayout info = new LinearLayout(this);
+        info.setOrientation(LinearLayout.VERTICAL);
+        TextView name = text(item.optInt("quantity", 1) + " × " + item.optString("name", "Item"), 16, true);
+        info.addView(name);
+        String options = item.optString("options", "");
+        if (!options.isEmpty()) {
+            TextView optionView = text(options, 14, false);
+            optionView.setTextColor(0xff68707C);
+            optionView.setPadding(0, dp(4), 0, 0);
+            info.addView(optionView);
         }
-        return !order.optString("delivered_at", "").trim().isEmpty();
-    }
+        row.addView(info, new LinearLayout.LayoutParams(0, -2, 1));
+        card.addView(row);
 
-    private String cleanStatusLabel(JSONObject order) {
-        if (isDeliveredOrder(order)) return "Delivered";
-        String label = order.optString("status_label", "").trim();
-        if (!label.isEmpty()) return label;
-        String status = order.optString("wc_status", order.optString("status", "pending")).trim();
-        if (status.startsWith("wc-")) status = status.substring(3);
-        switch (status) {
-            case "processing":
-            case "ukf-accepted": return "Restaurant Accepted";
-            case "ukf-preparing": return "Food Preparing";
-            case "ukf-pickup": return "Picked Up";
-            case "ukf-out": return "Out for Delivery";
-            default: return "Pending";
-        }
-    }
-
-    private String resolveNextStatus(JSONObject order) {
-        String next = order.optString("next_status", "").trim();
-        if (!next.isEmpty()) return next;
-        String status = order.optString("wc_status", order.optString("status", "")).trim().toLowerCase();
-        if (status.startsWith("wc-")) status = status.substring(3);
-        switch (status) {
-            case "pending":
-            case "on-hold":
-            case "ukf-received": return "ukf-accepted";
-            case "processing":
-            case "ukf-accepted":
-            case "accepted": return "ukf-preparing";
-            case "ukf-preparing":
-            case "preparing": return "ukf-pickup";
-            case "ukf-pickup":
-            case "pickup": return "ukf-out";
-            case "ukf-out":
-            case "out": return "ukf-delivered";
-            default: return "";
-        }
-    }
-
-    private String resolveNextLabel(JSONObject order, String nextStatus) {
-        String label = order.optString("next_label", "").trim();
-        if (!label.isEmpty()) return label;
-        switch (nextStatus) {
-            case "ukf-accepted": return "Restaurant Accepted";
-            case "ukf-preparing": return "Food Preparing";
-            case "ukf-pickup": return "Picked Up";
-            case "ukf-out": return "Out for Delivery";
-            case "ukf-delivered": return "Delivered";
-            default: return "Refresh Status";
-        }
+        String url = item.optString("image_url", "");
+        Glide.with(this).load(url).placeholder(R.drawable.ic_app).error(R.drawable.ic_app).into(image);
     }
 
     private TextView text(String value, int size, boolean bold) {
@@ -379,7 +300,5 @@ public class MainActivity extends AppCompatActivity {
             }).start())
             .setNegativeButton("CANCEL", null).show();
     }
-    private void resetOnlineDelivery() { new AlertDialog.Builder(this).setTitle("Online delivery charge paid?").setMessage("Admin se online delivery charge milne ke baad hi reset karein.").setPositiveButton("RESET", (d,w)->new Thread(()->{try{ApiClient.post(this,AppConfig.RESET_ONLINE_DELIVERY,new JSONObject());load();}catch(Exception e){runOnUiThread(()->toast(e.getMessage()));}}).start()).setNegativeButton("CANCEL",null).show(); }
-    private void resetCompanyCash() { new AlertDialog.Builder(this).setTitle("Submit and reset company cash?").setMessage("Company ko cash jama karne ke baad hi reset karein.").setPositiveButton("RESET", (d,w)->new Thread(()->{try{ApiClient.post(this,AppConfig.RESET,new JSONObject());load();}catch(Exception e){runOnUiThread(()->toast(e.getMessage()));}}).start()).setNegativeButton("CANCEL",null).show(); }
     private void toast(String s) { Toast.makeText(this, s == null ? "" : s, Toast.LENGTH_LONG).show(); }
 }
