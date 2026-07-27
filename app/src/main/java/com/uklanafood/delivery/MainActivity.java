@@ -22,6 +22,7 @@ import android.graphics.Color;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+import androidx.core.app.NotificationManagerCompat;
 import com.google.firebase.messaging.FirebaseMessaging;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -42,7 +43,10 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         if (!SessionManager.loggedIn(this)) { startActivity(new Intent(this, LoginActivity.class)); finish(); return; }
         setContentView(R.layout.activity_main);
+        NotificationManagerCompat.from(this).cancelAll();
+        RingtoneHelper.stop();
         bindViews();
+        ordersContainer.removeAllViews();
         deliveryName.setText(SessionManager.name(this) + "  •  Priority " + SessionManager.priority(this));
         pendingTab.setOnClickListener(v -> switchTab("pending"));
         doneTab.setOnClickListener(v -> switchTab("done"));
